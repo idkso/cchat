@@ -1,11 +1,4 @@
-#include "common.h"
-
-struct messages {
-	char **messages;
-	int *lengths;
-	int len;
-	int size;
-};
+#include "messages.h"
 
 int messages_init(struct messages *msgs, int size) {
 	msgs->messages = malloc(sizeof(char*) * size);
