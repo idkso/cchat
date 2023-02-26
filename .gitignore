@@ -1,0 +1,4 @@
+*.o
+cli
+serv
+compile_flags.txt
