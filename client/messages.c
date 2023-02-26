@@ -16,6 +16,8 @@ int append(struct messages *msgs, const char *msg, int len) {
 		msgs->size *= 2;
 		msgs->messages = realloc(msgs->messages, msgs->size);
 		if (msgs->messages == NULL) return ALLOC;
+		msgs->lengths = realloc(msgs->lengths, msgs->size);
+		if (msgs->lengths == NULL) return ALLOC;
 	}
 	msgs->messages[msgs->len] = malloc(len);
 	if (msgs->messages[msgs->len] == NULL) return ALLOC;
