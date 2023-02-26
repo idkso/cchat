@@ -47,10 +47,10 @@ void init(const char *hostname, const char *port,
 }
 
 
-void print_messages(struct messages *msgs) {
-	printf("\x1b[H\x1b[J");
+void print_messages(int tty, struct messages *msgs) {
+	dprintf(tty, "\x1b[H\x1b[J");
 	for (int x = 0; x < msgs->len; x++) {
-		printf("%.*s\n", msgs->lengths[x], msgs->messages[x]);
+		dprintf(tty, "%.*s\n", msgs->lengths[x], msgs->messages[x]);
 	}
 
 }
@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
 	int tty = open("/dev/tty", O_WRONLY);
 	int len, fd = 0; 
 	int screen_size = size.ws_row;
-	char * username = "username";
+	char username[] = "username";
 
 	struct pollfd pfds[2];
 	struct messages msgs;
@@ -78,7 +78,6 @@ int main(int argc, char *argv[]) {
 	messages_init(&msgs, 69);
 	init(argv[1], port, &fd, pfds);
 
-	print_messages(&msgs);
 	dprintf(tty, "\x1b[%d;0H[%s] >> ", screen_size, username);
 
 
@@ -97,7 +96,7 @@ int main(int argc, char *argv[]) {
 			if (len <= 0) exit(1);
 
 			append(&msgs, buf, len);
-			print_messages(&msgs);
+			print_messages(tty, &msgs);
 			dprintf(tty, "\x1b[%d;0H[%s] >> ", screen_size, username);
 		}
 	}
