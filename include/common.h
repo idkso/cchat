@@ -34,10 +34,6 @@
 enum errors {
 	NONE,
 	ALLOC,
-};
-
-struct users {
-	struct pollfd *pfds;
-	char **names;
-	size_t len, size, *name_lens;
+	UNKNOWN_CMD,
+	INVALID_ARGS,
 };

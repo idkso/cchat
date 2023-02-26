@@ -1,8 +1,9 @@
-#include "common.h"
+#include "server.h"
 #include <signal.h>
 
 #define PORT 6969
 #define CLI_MIN 16
+#define BUFSIZE 4096
 
 void broadcast(struct pollfd *pfds, int nclis,
 			   const char *name, int namelen,
@@ -33,6 +34,17 @@ int users_init(struct users *users) {
 	
 	users->name_lens = malloc(sizeof(size_t) * CLI_MIN);
 	if (users->name_lens == NULL) return ALLOC;
+
+	users->buffers = malloc(sizeof(char*) * CLI_MIN);
+	if (users->buffers == NULL) return ALLOC;
+
+	users->buf_lens = malloc(sizeof(size_t) * CLI_MIN);
+	if (users->buf_lens == NULL) return ALLOC;
+	
+	for (int i = 0; i < CLI_MIN; i++) {
+		users->buffers[i] = malloc(BUFSIZE);
+		if (users->buffers[i] == NULL) return ALLOC;
+	}
 	
 	users->len = 1;
 	users->size = CLI_MIN;
@@ -66,6 +78,7 @@ int main(void) {
 
 	CHECK(fd, socket(AF_INET, SOCK_STREAM, 0));
 	if (fd == -1) exit(1);
+	CHEXIT(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)));
 
 	serv.sin_family = AF_INET;
 	serv.sin_addr.s_addr = htonl(INADDR_ANY);
