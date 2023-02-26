@@ -12,7 +12,7 @@ COMMON_OBJ := $(COMMON_SRC:%.c=%.o)
 WARNINGS := -Wall -Wextra -Wpedantic -Wsuggest-attribute=pure -Wsuggest-attribute=noreturn -Wsuggest-attribute=cold -Walloca -Wduplicated-branches -Wduplicated-cond -Wfloat-equal -Wlarger-than=4KiB -Wpointer-arith
 CLIENT_OUT ?= cli
 SERVER_OUT ?= serv
-CFLAGS ?= -std=c99 -pipe
+CFLAGS ?= -std=c11 -pipe
 INCLUDE := -Iinclude
 LIB :=
 

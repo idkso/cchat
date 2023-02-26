@@ -39,15 +39,17 @@ int send_command(int fd, uint32_t cmd, ...) {
 	va_start(list, cmd);
 
 	switch (cmd) {
-	case MSG:
-	case SETNICK:
+	case C_MSG:
+	case C_SETNICK:
 		len = va_arg(list, uint32_t);
 		string = va_arg(list, char*);
 		_nputs(fd, (void*)&cmd, sizeof(uint32_t));
 		_nputs(fd, (void*)&len, sizeof(uint32_t));
 		_nputs(fd, string, len);
 		break;
-	case GETNICK:
+	case C_GETNICK:
+	case C_START_TYPING:
+	case C_STOP_TYPING:
 		_nputs(fd, (void*)&cmd, sizeof(uint32_t));
 		break;
 	default:
@@ -56,5 +58,64 @@ int send_command(int fd, uint32_t cmd, ...) {
 	_putc(fd, '\0');
 	
 	va_end(list);
+	return NONE;
+}
+
+// allocates memory in `buf`
+int read_string(int fd, uint32_t *len, char **buf) {
+	CHEXIT(read(fd, (void*)len, sizeof(uint32_t)));
+		
+	*buf = malloc(*len);
+	if (*buf == NULL) return ALLOC;
+	
+	CHEXIT(read(fd, *buf, *len));
+	return NONE;
+}
+
+// returns allocated buffer in any pointer
+int receive(int fd, struct response *out) {
+	uint32_t op;
+	char *buf;
+	int len;
+	
+	CHECK(len, read(fd, (void*)&op, sizeof(uint32_t)));
+	if (len == -1) exit(1);
+
+	switch (op) {
+	case R_MSG:
+		out->r = R_MSG;
+		if (read_string(fd, &op, &buf) != NONE) return ALLOC;
+		out->msg.name_len = op;
+		out->msg.name = buf;
+
+		if (read_string(fd, &op, &buf) != NONE) return ALLOC;
+		out->msg.msg_len = op;
+		out->msg.msg = buf;
+		break;
+	case R_SETNICK:
+		read(fd, (void*)&op, sizeof(uint32_t));
+		out->r = R_SETNICK;
+		out->ok = op;
+		break;
+	case R_GETNICK:
+		out->r = R_GETNICK;
+		if (read_string(fd, &op, &buf) != NONE) return ALLOC;
+		out->getnick.name_len = op;
+		out->getnick.name = buf;
+		break;
+	case R_START_TYPING:
+		out->r = R_START_TYPING;
+		if (read_string(fd, &op, &buf) != NONE) return ALLOC;
+		out->start_typing.name_len = op;
+		out->start_typing.name = buf;
+		break;
+	case R_STOP_TYPING:
+		out->r = R_STOP_TYPING;
+		if (read_string(fd, &op, &buf) != NONE) return ALLOC;
+		out->stop_typing.name_len = op;
+		out->stop_typing.name = buf;
+		break;
+	}
+
 	return NONE;
 }

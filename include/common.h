@@ -12,6 +12,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+#define err(str) errf("%s", str)
+#define errf(str, ...) do { fprintf(stderr, "error at %s:%d@%s: ", __FILE__, __LINE__, __func__); fprintf(stderr, str"\n", __VA_ARGS__); } while (0);
+
 #define CHECK(out, x)													\
 	do {																\
 		out = (x);														\
