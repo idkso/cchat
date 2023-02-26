@@ -1,8 +1,15 @@
-#define _POSIX_C_SOURCE 200112L
 #include "common.h"
+#include "messages.h"
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <termios.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+struct winsize size;
+
 
 void init(const char *hostname, const char *port,
 		  int *fd, struct pollfd pfds[2]) {
@@ -39,10 +46,27 @@ void init(const char *hostname, const char *port,
 	pfds[1].events = POLLIN | POLLPRI;
 }
 
+
+void print_messages(struct messages *msgs) {
+	printf("\x1b[H\x1b[J");
+	for (int x = 0; x < msgs->len; x++) {
+		printf("%.*s\n", msgs->lengths[x], msgs->messages[x]);
+	}
+
+}
+
+
 int main(int argc, char *argv[]) {
+	ioctl(0, TIOCGWINSZ, &size);
+
 	char buf[256], *port;
-	int len, fd = 0;
+	int tty = open("/dev/tty", O_WRONLY);
+	int len, fd = 0; 
+	int screen_size = size.ws_row;
+	char * username = "username";
+
 	struct pollfd pfds[2];
+	struct messages msgs;
 
 	if (argc < 2) {
 		fprintf(stderr, "usage: %s <hostname> [port]\n", argv[0]);
@@ -51,24 +75,30 @@ int main(int argc, char *argv[]) {
 
 	port = argc == 3 ? argv[2] : "6969";
 
+	messages_init(&msgs, 69);
 	init(argv[1], port, &fd, pfds);
+
+	print_messages(&msgs);
+	dprintf(tty, "\x1b[%d;0H[%s] >> ", screen_size, username);
+
 
 	while (true) {
 		CHEXIT(poll(pfds, 2, -1));
 
-		if (pfds[0].revents & POLLIN) {
+		if (pfds[0].revents & POLLIN) { //  User types a message
 			CHECK(len, read(STDIN_FILENO, buf, 256));
 			if (len == -1) exit(1);
 
 			CHEXIT(write(fd, buf, len));
 		}
 		
-		if (pfds[1].revents & POLLIN ) {
+		if (pfds[1].revents & POLLIN ) { //  Server broadcasts a new message
 			CHECK(len, read(fd, buf, 256));
-			if (len == -1) exit(1);
+			if (len <= 0) exit(1);
 
-			printf("[SERVER]: %.*s\n", len, buf);
+			append(&msgs, buf, len);
+			print_messages(&msgs);
+			dprintf(tty, "\x1b[%d;0H[%s] >> ", screen_size, username);
 		}
 	}
-	
 }
