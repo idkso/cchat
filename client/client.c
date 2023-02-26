@@ -4,10 +4,44 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+void init(const char *hostname, const char *port,
+		  int *fd, struct pollfd pfds[2]) {
+	int ret;
+	struct addrinfo hints = {0}, *servinfo, *p;
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+
+	if ((ret = getaddrinfo(hostname, port, &hints, &servinfo)) != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(ret));
+		exit(1);
+	}
+
+	for (p = servinfo; p != NULL; p = p->ai_next) {
+		CHECK(*fd, socket(p->ai_family, p->ai_socktype, p->ai_protocol));
+		if (*fd == -1) continue;
+
+		CHECK(ret, connect(*fd, p->ai_addr, p->ai_addrlen));
+		if (ret == -1) continue;
+
+		break;
+	}
+
+	if (p == NULL) {
+		fprintf(stderr, "failed to connect\n");
+		exit(1);
+	}
+
+	freeaddrinfo(servinfo);
+
+	pfds[0].fd = STDIN_FILENO;
+	pfds[0].events = POLLIN;
+	pfds[1].fd = *fd;
+	pfds[1].events = POLLIN | POLLPRI;
+}
+
 int main(int argc, char *argv[]) {
 	char buf[256], *port;
-	int ret, len, fd = 0;
-	struct addrinfo hints = {0}, *servinfo, *p;
+	int len, fd = 0;
 	struct pollfd pfds[2];
 
 	if (argc < 2) {
@@ -17,35 +51,7 @@ int main(int argc, char *argv[]) {
 
 	port = argc == 3 ? argv[2] : "6969";
 
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-
-	if ((ret = getaddrinfo(argv[1], port, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(ret));
-		return 1;
-	}
-
-	for (p = servinfo; p != NULL; p = p->ai_next) {
-		CHECK(fd, socket(p->ai_family, p->ai_socktype, p->ai_protocol));
-		if (fd == -1) continue;
-
-		CHECK(ret, connect(fd, p->ai_addr, p->ai_addrlen));
-		if (ret == -1) continue;
-
-		break;
-	}
-
-	if (p == NULL) {
-		fprintf(stderr, "failed to connect\n");
-		return 1;
-	}
-
-	freeaddrinfo(servinfo);
-
-	pfds[0].fd = STDIN_FILENO;
-	pfds[0].events = POLLIN;
-	pfds[1].fd = fd;
-	pfds[1].events = POLLIN | POLLPRI;
+	init(argv[1], port, &fd, pfds);
 
 	while (true) {
 		CHEXIT(poll(pfds, 2, -1));
