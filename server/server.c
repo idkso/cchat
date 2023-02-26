@@ -1,25 +1,56 @@
 #include "common.h"
 
 #define PORT 6969
-#define CLI_MAX 16
+#define CLI_MIN 16
 
 void broadcast(struct pollfd *pfds, int nclis,
+			   const char *name, int namelen,
 			   const char *msg, int len) {
 	for (int i = 1; i < nclis; i++) {
-		CHEXIT(write(pfds[i].fd, msg, len));
+		CHEXIT(dprintf(pfds[i].fd, "%.*s: %.*s", namelen, name, len, msg));
 	}
 }
 
 void del(struct pollfd *pfds, int nclis, int i) {
 	pfds[i] = pfds[nclis-1];
-	pfds[nclis-1] = (struct pollfd){0};
+}
+
+void init_names(char **names, size_t *lens, size_t amt) {
+	for (size_t i = 0; i < amt; i++) {
+		names[i] = malloc(16);
+		lens[i] = 16;
+		snprintf(names[i], 16, "User %d", (int)i);
+	}
+}
+
+int users_init(struct users *users) {
+	users->pfds = malloc(sizeof(struct pollfd) * CLI_MIN+1);
+	if (users->pfds == NULL) return ALLOC;
+	
+	users->names = malloc(sizeof(char*) * CLI_MIN);
+	if (users->names == NULL) return ALLOC;
+	
+	users->name_lens = malloc(sizeof(size_t) * CLI_MIN);
+	if (users->name_lens == NULL) return ALLOC;
+	
+	users->len = 1;
+	users->size = CLI_MIN;
+	init_names(users->names, users->name_lens, 16);
+	return NONE;
 }
 
 int main(void) {
-	char buf[256];
-	int conn, len, pres, fd, nclis = 1;
+	char *buf;
+	size_t buflen = 65536;
+	int conn, len, pres, fd = 1;
 	struct sockaddr_in serv = {0};
-	struct pollfd pfds[CLI_MAX+1] = {{0}};
+	struct users users;
+
+	buf = malloc(buflen);
+	if (users_init(&users) != NONE || buf == NULL) {
+		fprintf(stderr, "error allocating memory\n");
+		exit(1);
+	}
 
 	CHECK(fd, socket(AF_INET, SOCK_STREAM, 0));
 	if (fd == -1) exit(1);
@@ -32,35 +63,37 @@ int main(void) {
 
 	CHEXIT(listen(fd, 8));
 
-	pfds[0].fd = fd;
-	pfds[0].events = POLLIN | POLLPRI;
+	users.pfds[0].fd = fd;
+	users.pfds[0].events = POLLIN | POLLPRI;
 	
 	while (true) {
-		CHECK(pres, poll(pfds, nclis, -1));
+		CHECK(pres, poll(users.pfds, users.len, -1));
 		if (pres == -1) exit(1);
 
-		if (pfds[0].revents & POLLIN) {
+		if (users.pfds[0].revents & POLLIN) {
 			CHECK(conn, accept(fd, NULL, NULL));
 			if (conn != -1) {
-				broadcast(pfds, nclis, "someone joined", 14);
+				broadcast(users.pfds, users.len, "server",
+						  6, "someone joined", 14);
 				
-				pfds[nclis].fd = conn;
-				pfds[nclis].events = POLLIN | POLLPRI;
-				nclis++;
+				users.pfds[users.len].fd = conn;
+				users.pfds[users.len].events = POLLIN | POLLPRI;
+				users.len++;
 			}
 		}
 
-		for (int i = 1; i < nclis; i++) {
-			if ((pfds[i].revents & POLLIN) == 0)
+		for (size_t i = 1; i < users.len; i++) {
+			if ((users.pfds[i].revents & POLLIN) == 0)
 				continue;
 
-			CHECK(len, read(pfds[i].fd, buf, 256));
+			CHECK(len, read(users.pfds[i].fd, buf, buflen));
 			if (len <= 0) {
-				del(pfds, nclis--, i);
+				del(users.pfds, users.len--, i);
 				continue;
 			}
 
-			broadcast(pfds, nclis, buf, len);
+			broadcast(users.pfds, users.len, users.names[i],
+					  users.name_lens[i], buf, len);
 		}
 	}
 	

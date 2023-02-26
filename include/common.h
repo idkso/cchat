@@ -1,4 +1,5 @@
 #pragma once
+#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -30,3 +31,13 @@
 	} while (0)
 
 
+enum errors {
+	NONE,
+	ALLOC,
+};
+
+struct users {
+	struct pollfd *pfds;
+	char **names;
+	size_t len, size, *name_lens;
+};
