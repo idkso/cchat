@@ -1,2 +1,19 @@
 * chad chad chad chad chad chad
 chat
+
+* todo
+things 2 todo
+** server
+- [ ] usernames
+- [ ] user events
+- [ ] rooms
+  
+** client
+- [ ] scrolling
+- [ ] / commands
+- [ ] logins
+- [ ] typing indicators
+- [ ] markdown
+
+** maybe
+- [ ] history saved server-side
