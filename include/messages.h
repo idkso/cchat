@@ -9,4 +9,4 @@ struct messages {
 };
 
 int messages_init(struct messages *msgs, int size);
-int append(struct messages *msgs, const char *msg, int len);
+int append(struct messages *msgs, const char *msg, int msg_len, const char *name, int name_len);

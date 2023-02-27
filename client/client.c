@@ -1,3 +1,4 @@
+#include "command.h"
 #include "common.h"
 #include "messages.h"
 #include "typing.h"
@@ -10,6 +11,22 @@
 #include <unistd.h>
 
 struct winsize size;
+
+struct termios raw;
+struct termios orig;
+
+
+void uncook() {
+    tcgetattr(STDIN_FILENO, &orig);
+    raw = orig;
+    raw.c_lflag &= ~(ECHO | ICANON);
+    raw.c_iflag &= ~(ICRNL | IGNBRK);
+    tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+}
+
+void cook() {
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig);
+}
 
 
 void init(const char *hostname, const char *port,
@@ -70,6 +87,7 @@ int main(int argc, char *argv[]) {
 	struct pollfd pfds[2];
 	struct messages msgs;
 	struct typing_users typing;
+	struct response in;
 
 	if (argc < 2) {
 		fprintf(stderr, "usage: %s <hostname> [port]\n", argv[0]);
@@ -91,15 +109,21 @@ int main(int argc, char *argv[]) {
 			CHECK(len, read(STDIN_FILENO, buf, 256));
 			if (len == -1) exit(1);
 
-			CHEXIT(write(fd, buf, len));
+			send_command(pfds[1].fd, C_MSG, len, buf);
 		}
 		
 		if (pfds[1].revents & POLLIN ) { //  Server broadcasts a new message
-			CHECK(len, read(fd, buf, 256));
-			if (len <= 0) exit(1);
+			receive_response(pfds[1].fd, &in);
 
-			append(&msgs, buf, len);
-			print_messages(tty, &msgs);
+			switch (in.r) {
+				case R_MSG:
+					append(&msgs, in.msg.msg, in.msg.msg_len, in.msg.name, in.msg.name_len);
+					print_messages(tty, &msgs);
+					break;
+					
+			}
+			
+
 			get_indicator(&typing, indicator);
 			dprintf(tty, "\x1b[%d;0H%s\n[%s] >> ", screen_size - 1, indicator, username);
 		}

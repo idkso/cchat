@@ -11,7 +11,7 @@ int messages_init(struct messages *msgs, int size) {
 }
 
 // copies all memory from `msg`
-int append(struct messages *msgs, const char *msg, int len) {
+int append(struct messages *msgs, const char *msg, int msg_len, const char *name, int name_len) {
 	if (msgs->len >= msgs->size) {
 		msgs->size *= 2;
 		msgs->messages = realloc(msgs->messages, sizeof(char*) * msgs->size);
@@ -19,10 +19,11 @@ int append(struct messages *msgs, const char *msg, int len) {
 		msgs->lengths = realloc(msgs->lengths, sizeof(int) * msgs->size);
 		if (msgs->lengths == NULL) return ALLOC;
 	}
-	msgs->messages[msgs->len] = malloc(len);
+	msgs->messages[msgs->len] = malloc(msg_len + name_len);
 	if (msgs->messages[msgs->len] == NULL) return ALLOC;
-	memcpy(msgs->messages[msgs->len], msg, len);
-	msgs->lengths[msgs->len] = len;
+	memcpy(msgs->messages[msgs->len], name, name_len);
+	memcpy(msgs->messages[msgs->len], msg, msg_len);
+	msgs->lengths[msgs->len] = msg_len + name_len;
 	msgs->len++;
 	return NONE;
 }
