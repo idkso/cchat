@@ -53,4 +53,4 @@ struct response {
 int send_command(int fd, uint32_t cmd, ...);
 int receive_response(int fd, struct response *out);
 int send_response(int fd, uint32_t cmd, ...);
-int receive_command(int fd, struct response *out);
+int receive_command(int fd, struct command *out);

@@ -105,8 +105,8 @@ int receive_response(int fd, struct response *out) {
 	case R_USER_JOIN:
 		out->r = op;
 		if (read_string(fd, &op, &buf) != NONE) return ALLOC;
-		out->stop_typing.name_len = op;
-		out->stop_typing.name = buf;
+		out->stop_typing.len = op;
+		out->stop_typing.value = buf;
 		break;
 	}
 
@@ -167,12 +167,12 @@ int receive_command(int fd, struct command *out) {
 	case C_MSG:
 	case C_SETNICK:
 		if (read_string(fd, &op, &buf) != NONE) return ALLOC;
-		out->len = op;
-		out->value = buf;
+		out->setnick.len = op;
+		out->setnick.value = buf;
 		break;
 	case C_GETNICK:
 	case C_START_TYPING:
-	case C_STOP_STYPING:
+	case C_STOP_TYPING:
 		break;
 	}
 

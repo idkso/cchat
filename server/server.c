@@ -1,18 +1,79 @@
 #include "server.h"
+#include "command.h"
 #include <signal.h>
 #include <time.h>
+#include <stdarg.h>
 
 #define PORT 6969
 #define CLI_MIN 16
 #define BUFSIZE 4096
 
-void broadcast(struct pollfd *pfds, int nclis,
-			   const char *name, int namelen,
-			   const char *msg, int len) {
-	struct timespec t1 = {0}, t2 = {0};
-	for (int i = 1; i < nclis; i++) {
-		CHEXIT(dprintf(pfds[i].fd, "%.*s: %.*s", namelen, name, len, msg));
+int broadcast_message(struct users *users, uint32_t sender,
+					  uint32_t len, const char *msg) {
+	for (uint32_t i = 0; i < users->len; i++) {
+		send_response(users->pfds[i+1].fd, R_MSG,
+					  users->name_lens[sender], users->names[sender], len, msg);
 	}
+	return NONE;
+}
+
+int broadcast_typing(struct users *users, uint32_t sender, uint32_t ev) {
+	for (uint32_t i = 0; i < users->len; i++) {
+		send_response(users->pfds[i+1].fd, ev,
+					  users->name_lens[sender], users->names[sender]);
+	}
+	return NONE;
+}
+
+int broadcast_join(struct users *users, uint32_t sender) {
+	for (uint32_t i = 0; i < users->len; i++) {
+		if (i == sender) continue;
+		send_response(users->pfds[i+1].fd, R_USER_JOIN,
+					  users->name_lens[sender], users->names[sender]);
+	}
+	return NONE;
+}
+
+int send_event(struct users *users, uint32_t event, ...) {
+	char *buf;
+	int sender, num;
+	va_list list;
+
+	va_start(list, event);
+
+	switch (event) {
+	case R_MSG:
+		sender = va_arg(list, int);
+		num = va_arg(list, uint32_t);
+		buf = va_arg(list, char*);
+		broadcast_message(users, sender, num, buf);
+		break;
+	case R_GETNICK:
+		sender = va_arg(list, int);
+		send_response(users->pfds[sender].fd, R_GETNICK,
+					  users->name_lens[sender], users->names[sender]);
+		break;
+	case R_SETNICK:
+		sender = va_arg(list, int);
+		num = va_arg(list, int);
+		send_response(users->pfds[sender].fd, R_SETNICK, sender, num);
+		break;
+	case R_STOP_TYPING:
+	case R_START_TYPING:
+		sender = va_arg(list, int);
+		broadcast_typing(users, sender, event);
+		break;
+	case R_USER_JOIN:
+		sender = va_arg(list, int);
+		broadcast_join(users, sender);
+		break;
+	default:
+		return UNKNOWN_CMD;
+	}
+	
+	va_end(list);
+	
+	return NONE;
 }
 
 void del(struct pollfd *pfds, int nclis, int i) {
@@ -57,9 +118,10 @@ int users_init(struct users *users) {
 int main(void) {
 	char *buf;
 	size_t buflen = 65536;
-	int conn, len, pres, fd;
+	int conn, pres, fd;
 	struct sockaddr_in serv = {0};
 	struct users users;
+	struct command in;
 
 	buf = malloc(buflen);
 	if (users_init(&users) != NONE || buf == NULL) {
@@ -81,7 +143,7 @@ int main(void) {
 
 	users.pfds[0].fd = fd;
 	users.pfds[0].events = POLLIN | POLLPRI;
-	
+
 	while (true) {
 		CHECK(pres, poll(users.pfds, users.len, -1));
 		if (pres == -1) exit(1);
@@ -89,11 +151,9 @@ int main(void) {
 		if (users.pfds[0].revents & POLLIN) {
 			CHECK(conn, accept(fd, NULL, NULL));
 			if (conn != -1) {
-				broadcast(users.pfds, users.len, "server",
-						  6, "someone joined", 14);
-				
 				users.pfds[users.len].fd = conn;
 				users.pfds[users.len].events = POLLIN | POLLPRI;
+				send_event(&users, R_USER_JOIN, users.len);
 				users.len++;
 			}
 		}
@@ -102,14 +162,29 @@ int main(void) {
 			if ((users.pfds[i].revents & POLLIN) == 0)
 				continue;
 
-			CHECK(len, read(users.pfds[i].fd, buf, buflen));
-			if (len <= 0) {
-				del(users.pfds, users.len--, i);
-				continue;
+			if (receive_command(users.pfds[i].fd, &in) != NONE) {
+				fprintf(stderr, "alloc error");
+				return 1;
 			}
 
-			broadcast(users.pfds, users.len, users.names[i],
-					  users.name_lens[i], buf, len);
+		    switch (in.type) {
+			case C_STOP_TYPING:
+				send_event(&users, R_STOP_TYPING, i-1);
+				break;
+			case C_START_TYPING:
+				send_event(&users, R_START_TYPING, i-1);
+				break;
+			case C_SETNICK:
+				free(users.names[i-1]);
+				users.names[i-1] = in.setnick.value;
+				users.name_lens[i-1] = in.setnick.len;
+				send_event(&users, R_SETNICK, i-1, 1);
+				break;
+			case C_MSG:
+				broadcast_message(&users, i-1, in.msg.len, in.msg.value);
+				free(in.msg.value);
+				break;
+			}
 		}
 	}
 	
