@@ -1,5 +1,6 @@
 #include "server.h"
 #include <signal.h>
+#include <time.h>
 
 #define PORT 6969
 #define CLI_MIN 16
@@ -8,6 +9,7 @@
 void broadcast(struct pollfd *pfds, int nclis,
 			   const char *name, int namelen,
 			   const char *msg, int len) {
+	struct timespec t1 = {0}, t2 = {0};
 	for (int i = 1; i < nclis; i++) {
 		CHEXIT(dprintf(pfds[i].fd, "%.*s: %.*s", namelen, name, len, msg));
 	}
@@ -52,23 +54,12 @@ int users_init(struct users *users) {
 	return NONE;
 }
 
-static int fd;
-
-__attribute__((noreturn))
-void handle_sigint(int x) {
-	(void)x;
-	close(fd);
-	exit(1);
-}
-
 int main(void) {
 	char *buf;
 	size_t buflen = 65536;
-	int conn, len, pres;
+	int conn, len, pres, fd;
 	struct sockaddr_in serv = {0};
 	struct users users;
-
-	signal(SIGINT, handle_sigint);
 
 	buf = malloc(buflen);
 	if (users_init(&users) != NONE || buf == NULL) {
