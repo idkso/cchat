@@ -1,5 +1,6 @@
 #include "common.h"
 #include "messages.h"
+#include "typing.h"
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -64,9 +65,11 @@ int main(int argc, char *argv[]) {
 	int len, fd = 0; 
 	int screen_size = size.ws_row;
 	char username[] = "username";
+	char indicator[50];
 
 	struct pollfd pfds[2];
 	struct messages msgs;
+	struct typing_users typing;
 
 	if (argc < 2) {
 		fprintf(stderr, "usage: %s <hostname> [port]\n", argv[0]);
@@ -97,7 +100,8 @@ int main(int argc, char *argv[]) {
 
 			append(&msgs, buf, len);
 			print_messages(tty, &msgs);
-			dprintf(tty, "\x1b[%d;0H[%s] >> ", screen_size, username);
+			get_indicator(&typing, indicator);
+			dprintf(tty, "\x1b[%d;0H%s\n[%s] >> ", screen_size - 1, indicator, username);
 		}
 	}
 }
