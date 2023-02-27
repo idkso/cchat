@@ -36,6 +36,8 @@ int send_command(int fd, uint32_t cmd, ...) {
 	char *string;
 	va_list list;
 
+	memset(buf, 0, 256);
+
 	va_start(list, cmd);
 
 	switch (cmd) {
@@ -73,7 +75,7 @@ int read_string(int fd, uint32_t *len, char **buf) {
 }
 
 // returns allocated buffer in any pointer
-int receive(int fd, struct response *out) {
+int receive_response(int fd, struct response *out) {
 	uint32_t op;
 	char *buf;
 	int len;
@@ -98,22 +100,79 @@ int receive(int fd, struct response *out) {
 		out->ok = op;
 		break;
 	case R_GETNICK:
-		out->r = R_GETNICK;
-		if (read_string(fd, &op, &buf) != NONE) return ALLOC;
-		out->getnick.name_len = op;
-		out->getnick.name = buf;
-		break;
 	case R_START_TYPING:
-		out->r = R_START_TYPING;
-		if (read_string(fd, &op, &buf) != NONE) return ALLOC;
-		out->start_typing.name_len = op;
-		out->start_typing.name = buf;
-		break;
 	case R_STOP_TYPING:
-		out->r = R_STOP_TYPING;
+	case R_USER_JOIN:
+		out->r = op;
 		if (read_string(fd, &op, &buf) != NONE) return ALLOC;
 		out->stop_typing.name_len = op;
 		out->stop_typing.name = buf;
+		break;
+	}
+
+	return NONE;
+}
+
+int send_response(int fd, uint32_t cmd, ...) {
+	uint32_t len;
+	char *string;
+	va_list list;
+
+	memset(buf, 0, 256);
+
+	va_start(list, cmd);
+
+	switch (cmd) {
+	case R_MSG:
+		len = va_arg(list, uint32_t);
+		string = va_arg(list, char*);
+		_nputs(fd, (void*)&cmd, sizeof(uint32_t));
+		_nputs(fd, (void*)&len, sizeof(uint32_t));
+		_nputs(fd, string, len);
+
+		len = va_arg(list, uint32_t);
+		string = va_arg(list, char*);
+		_nputs(fd, (void*)&len, sizeof(uint32_t));
+		_nputs(fd, string, len);
+		break;
+	case R_GETNICK:
+	case R_START_TYPING:
+	case R_STOP_TYPING:
+		len = va_arg(list, uint32_t);
+		string = va_arg(list, char*);
+		_nputs(fd, (void*)&cmd, sizeof(uint32_t));
+		_nputs(fd, (void*)&len, sizeof(uint32_t));
+		_nputs(fd, string, len);
+		break;
+	default:
+		return UNKNOWN_CMD;
+	}
+	_putc(fd, '\0');
+	
+	va_end(list);
+	return NONE;
+}
+
+int receive_command(int fd, struct command *out) {
+	uint32_t op;
+	char *buf;
+	int len;
+	
+	CHECK(len, read(fd, (void*)&op, sizeof(uint32_t)));
+	if (len == -1) exit(1);
+
+	out->type = op;
+	
+	switch (op) {
+	case C_MSG:
+	case C_SETNICK:
+		if (read_string(fd, &op, &buf) != NONE) return ALLOC;
+		out->len = op;
+		out->value = buf;
+		break;
+	case C_GETNICK:
+	case C_START_TYPING:
+	case C_STOP_STYPING:
 		break;
 	}
 
