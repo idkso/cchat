@@ -32,8 +32,8 @@ release: CC = clang
 release: CFLAGS += -O2 -flto=thin
 release: all
 
-format: $(SRC) $(HEADERS)
-	clang-format -i $(SRC) $(HEADERS)
+format: $(CLIENT_SRC) $(SERVER_SRC) $(COMMON_SRC) $(HEADERS)
+	clang-format -i $^ 
 
 debugger: debug
 	gdb $(OUT)
