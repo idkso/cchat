@@ -2,8 +2,10 @@
 #include "common.h"
 
 struct messages {
-	char **messages;
-	int *lengths;
+	char **names;
+	char **msgs;
+	int *msg_lens;
+	int *name_lens;
 	int len;
 	int size;
 };
