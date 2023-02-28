@@ -68,7 +68,7 @@ void init(const char *hostname, const char *port,
 void print_messages(int tty, struct messages *msgs) {
 	dprintf(tty, "\x1b[H\x1b[J");
 	for (int x = 0; x < msgs->len; x++) {
-		dprintf(tty, "%.*s\n", msgs->lengths[x], msgs->messages[x]);
+		dprintf(tty, "%.*s\n", msgs->msg_lens[x], msgs->msgs[x]);
 	}
 
 }
@@ -119,13 +119,13 @@ int main(int argc, char *argv[]) {
 				case R_MSG:
 					append(&msgs, in.msg.msg, in.msg.msg_len, in.msg.name, in.msg.name_len);
 					print_messages(tty, &msgs);
+
+					get_indicator(&typing, indicator);
+					dprintf(tty, "\x1b[%d;0H%s\n[%s] >> ", screen_size - 1, indicator, username);
 					break;
 					
 			}
 			
-
-			get_indicator(&typing, indicator);
-			dprintf(tty, "\x1b[%d;0H%s\n[%s] >> ", screen_size - 1, indicator, username);
 		}
 	}
 }
