@@ -11,7 +11,8 @@ int messages_init(struct messages *msgs, int size) {
 }
 
 // copies all memory from `msg`
-int append(struct messages *msgs, const char *msg, int msg_len, const char *name, int name_len) {
+int append(struct messages *msgs, const char *msg, int msg_len,
+		   const char *name, int name_len) {
 	if (msgs->len >= msgs->size) {
 		msgs->size *= 2;
 		msgs->messages = realloc(msgs->messages, sizeof(char*) * msgs->size);

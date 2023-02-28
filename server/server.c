@@ -83,8 +83,7 @@ void del(struct pollfd *pfds, int nclis, int i) {
 void init_names(char **names, size_t *lens, size_t amt) {
 	for (size_t i = 0; i < amt; i++) {
 		names[i] = malloc(16);
-		lens[i] = 16;
-		snprintf(names[i], 16, "User %d", (int)i);
+		lens[i] = snprintf(names[i], 16, "User %d", (int)i);
 	}
 }
 
@@ -158,30 +157,30 @@ int main(void) {
 			}
 		}
 
-		for (size_t i = 1; i < users.len; i++) {
-			if ((users.pfds[i].revents & POLLIN) == 0)
+		for (size_t i = 0; i < users.len; i++) {
+			if ((users.pfds[i+1].revents & POLLIN) == 0)
 				continue;
 
-			if (receive_command(users.pfds[i].fd, &in) != NONE) {
+			if (receive_command(users.pfds[i+1].fd, &in) != NONE) {
 				fprintf(stderr, "alloc error");
 				return 1;
 			}
 
 		    switch (in.type) {
 			case C_STOP_TYPING:
-				send_event(&users, R_STOP_TYPING, i-1);
+				send_event(&users, R_STOP_TYPING, i);
 				break;
 			case C_START_TYPING:
-				send_event(&users, R_START_TYPING, i-1);
+				send_event(&users, R_START_TYPING, i);
 				break;
 			case C_SETNICK:
-				free(users.names[i-1]);
-				users.names[i-1] = in.setnick.value;
-				users.name_lens[i-1] = in.setnick.len;
-				send_event(&users, R_SETNICK, i-1, 1);
+				free(users.names[i]);
+				users.names[i] = in.setnick.value;
+				users.name_lens[i] = in.setnick.len;
+				send_event(&users, R_SETNICK, i, 1);
 				break;
 			case C_MSG:
-				broadcast_message(&users, i-1, in.msg.len, in.msg.value);
+				send_event(&users, R_MSG, i, in.msg.len, in.msg.value);
 				free(in.msg.value);
 				break;
 			}
