@@ -23,6 +23,7 @@ static void _putc(int fd, int c) {
 
 static void _flush(int fd) {
 	write(fd, buf, len);
+	len = 0;
 }
 
 static void _nputs(int fd, char *s, int len) {

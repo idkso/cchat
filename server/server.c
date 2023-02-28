@@ -76,8 +76,9 @@ int send_event(struct users *users, uint32_t event, ...) {
 	return NONE;
 }
 
-void del(struct pollfd *pfds, int nclis, int i) {
-	pfds[i] = pfds[nclis-1];
+void del(struct users *users, int i) {
+	users->pfds[i+1] = users->pfds[users->len+1];
+	users->len--;
 }
 
 int init_names(char **names, size_t *lens, size_t amt) {
@@ -161,8 +162,10 @@ int main(void) {
 		}
 
 		for (uint32_t i = 0; i < users.len; i++) {
-			if ((users.pfds[i+1].revents & POLLIN) == 0)
-				continue;
+			if ((users.pfds[i+1].revents & POLLIN) == 0) {
+				if (users.pfds[i+1].revents == 0) continue;
+				del(&users, i);
+			}
 
 			if (receive_command(users.pfds[i+1].fd, &in) != NONE) {
 				fprintf(stderr, "alloc error");
