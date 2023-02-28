@@ -12,18 +12,17 @@ static char buf[256];
 static int len = 0;
 
 static void _putc(int fd, int c) {
-    if (len < 256 && c != '\0') {
+    if (len < 255) {
         buf[len++] = c;
     } else {
-        if (len < 255) {
-            buf[len++] = c;
-            write(fd, buf, len);
-        } else {
-			buf[len++] = c;
-            write(fd, buf, len);
-        }
+        buf[len++] = c;
+        write(fd, buf, len);
         len = 0;
     }
+}
+
+static void _flush(int fd) {
+	write(fd, buf, len);
 }
 
 static void _nputs(int fd, char *s, int len) {
@@ -57,7 +56,7 @@ int send_command(int fd, uint32_t cmd, ...) {
 	default:
 		return UNKNOWN_CMD;
 	}
-	_putc(fd, '\0');
+	_flush(fd);
 	
 	va_end(list);
 	return NONE;
@@ -147,7 +146,7 @@ int send_response(int fd, uint32_t cmd, ...) {
 	default:
 		return UNKNOWN_CMD;
 	}
-	_putc(fd, '\0');
+	_flush(fd);
 	
 	va_end(list);
 	return NONE;

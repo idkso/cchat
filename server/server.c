@@ -80,11 +80,13 @@ void del(struct pollfd *pfds, int nclis, int i) {
 	pfds[i] = pfds[nclis-1];
 }
 
-void init_names(char **names, size_t *lens, size_t amt) {
+int init_names(char **names, size_t *lens, size_t amt) {
 	for (size_t i = 0; i < amt; i++) {
 		names[i] = malloc(16);
+		if (names[i] == NULL) return ALLOC;
 		lens[i] = snprintf(names[i], 16, "User %d", (int)i);
 	}
+	return NONE;
 }
 
 int users_init(struct users *users) {
@@ -108,9 +110,10 @@ int users_init(struct users *users) {
 		if (users->buffers[i] == NULL) return ALLOC;
 	}
 	
-	users->len = 1;
+	users->len = 0;
 	users->size = CLI_MIN;
-	init_names(users->names, users->name_lens, 16);
+	if (init_names(users->names, users->name_lens, 16) != NONE)
+		return ALLOC;
 	return NONE;
 }
 
@@ -144,20 +147,20 @@ int main(void) {
 	users.pfds[0].events = POLLIN | POLLPRI;
 
 	while (true) {
-		CHECK(pres, poll(users.pfds, users.len, -1));
+		CHECK(pres, poll(users.pfds, users.len+1, -1));
 		if (pres == -1) exit(1);
 
 		if (users.pfds[0].revents & POLLIN) {
 			CHECK(conn, accept(fd, NULL, NULL));
 			if (conn != -1) {
-				users.pfds[users.len].fd = conn;
-				users.pfds[users.len].events = POLLIN | POLLPRI;
-				send_event(&users, R_USER_JOIN, users.len);
+				users.pfds[users.len+1].fd = conn;
+				users.pfds[users.len+1].events = POLLIN | POLLPRI;
+				//send_event(&users, R_USER_JOIN, users.len);
 				users.len++;
 			}
 		}
 
-		for (size_t i = 0; i < users.len; i++) {
+		for (uint32_t i = 0; i < users.len; i++) {
 			if ((users.pfds[i+1].revents & POLLIN) == 0)
 				continue;
 

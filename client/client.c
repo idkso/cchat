@@ -16,7 +16,7 @@ struct termios raw;
 struct termios orig;
 
 
-void uncook() {
+void uncook(void) {
     tcgetattr(STDIN_FILENO, &orig);
     raw = orig;
     raw.c_lflag &= ~(ECHO | ICANON);
@@ -24,7 +24,7 @@ void uncook() {
     tcsetattr(STDIN_FILENO, TCSANOW, &raw);
 }
 
-void cook() {
+void cook(void) {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig);
 }
 
