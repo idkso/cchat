@@ -1,3 +1,4 @@
+#pragma once
 #include <stdio.h>
 
 struct typing_users {

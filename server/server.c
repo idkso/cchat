@@ -35,37 +35,32 @@ int broadcast_join(struct users *users, uint32_t sender) {
     return NONE;
 }
 
-int send_event(struct users *users, uint32_t event, ...) {
+int send_event(struct users *users, uint32_t event, uint32_t sender, ...) {
     char *buf;
-    int sender, num;
+    int num;
     va_list list;
 
-    va_start(list, event);
-
+    va_start(list, sender);
+4
     switch (event) {
     case R_MSG:
-        sender = va_arg(list, int);
         num = va_arg(list, uint32_t);
         buf = va_arg(list, char *);
         broadcast_message(users, sender, num, buf);
         break;
     case R_GETNICK:
-        sender = va_arg(list, int);
         send_response(users->pfds[sender].fd, R_GETNICK,
                       users->name_lens[sender], users->names[sender]);
         break;
     case R_SETNICK:
-        sender = va_arg(list, int);
         num = va_arg(list, int);
         send_response(users->pfds[sender].fd, R_SETNICK, sender, num);
         break;
     case R_STOP_TYPING:
     case R_START_TYPING:
-        sender = va_arg(list, int);
         broadcast_typing(users, sender, event);
         break;
     case R_USER_JOIN:
-        sender = va_arg(list, int);
         broadcast_join(users, sender);
         break;
     default:
@@ -78,7 +73,7 @@ int send_event(struct users *users, uint32_t event, ...) {
 }
 
 void del(struct users *users, int i) {
-    users->pfds[i + 1] = users->pfds[users->len + 1];
+    users->pfds[i + 1] = users->pfds[users->len];
     users->len--;
 }
 
@@ -127,15 +122,12 @@ int users_init(struct users *users) {
 }
 
 int main(void) {
-    char *buf;
-    size_t buflen = 65536;
     int conn, pres, fd;
     struct sockaddr_in serv = {0};
     struct users users;
     struct command in;
 
-    buf = malloc(buflen);
-    if (users_init(&users) != NONE || buf == NULL) {
+    if (users_init(&users) != NONE) {
         fprintf(stderr, "error allocating memory\n");
         exit(1);
     }
@@ -164,10 +156,11 @@ int main(void) {
         if (users.pfds[0].revents & POLLIN) {
             CHECK(conn, accept(fd, NULL, NULL));
             if (conn != -1) {
-                users.pfds[users.len + 1].fd = conn;
-                users.pfds[users.len + 1].events = POLLIN | POLLPRI;
+				users.len++;
+                users.pfds[users.len].fd = conn;
+                users.pfds[users.len].events = POLLIN | POLLPRI;
                 // send_event(&users, R_USER_JOIN, users.len);
-                users.len++;
+                
             }
         }
 
@@ -176,6 +169,7 @@ int main(void) {
                 if (users.pfds[i + 1].revents == 0)
                     continue;
                 del(&users, i);
+				continue;
             }
 
             if (receive_command(users.pfds[i + 1].fd, &in) != NONE) {
