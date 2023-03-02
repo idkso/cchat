@@ -41,7 +41,7 @@ int send_event(struct users *users, uint32_t event, uint32_t sender, ...) {
     va_list list;
 
     va_start(list, sender);
-4
+
     switch (event) {
     case R_MSG:
         num = va_arg(list, uint32_t);
@@ -100,20 +100,6 @@ int users_init(struct users *users) {
     if (users->name_lens == NULL)
         return ALLOC;
 
-    users->buffers = malloc(sizeof(char *) * CLI_MIN);
-    if (users->buffers == NULL)
-        return ALLOC;
-
-    users->buf_lens = malloc(sizeof(size_t) * CLI_MIN);
-    if (users->buf_lens == NULL)
-        return ALLOC;
-
-    for (int i = 0; i < CLI_MIN; i++) {
-        users->buffers[i] = malloc(BUFSIZE);
-        if (users->buffers[i] == NULL)
-            return ALLOC;
-    }
-
     users->len = 0;
     users->size = CLI_MIN;
     if (init_names(users->names, users->name_lens, 16) != NONE)
@@ -160,7 +146,6 @@ int main(void) {
                 users.pfds[users.len].fd = conn;
                 users.pfds[users.len].events = POLLIN | POLLPRI;
                 // send_event(&users, R_USER_JOIN, users.len);
-                
             }
         }
 

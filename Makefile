@@ -28,8 +28,8 @@ analyze: CC = gcc
 analyze: CFLAGS += -fanalyzer
 analyze: debug
 
-release: CC = clang
-release: CFLAGS += -O2 -flto=thin
+release: CC = gcc 
+release: CFLAGS += -O2
 release: all
 
 format: $(CLIENT_SRC) $(SERVER_SRC) $(COMMON_SRC) $(HEADERS)
