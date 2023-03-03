@@ -17,6 +17,7 @@
     do {                                                                       \
         fprintf(stderr, "error at %s:%d@%s: ", __FILE__, __LINE__, __func__);  \
         fprintf(stderr, str "\n", __VA_ARGS__);                                \
+        fflush(stderr);                                                        \
     } while (0);
 
 #define CHECK(out, x)                                                          \
@@ -25,6 +26,7 @@
         if (out == -1) {                                                       \
             fprintf(stderr, "error at %s:%d@%s '%s': %s\n", __FILE__,          \
                     __LINE__, __func__, #x, strerror(errno));                  \
+            fflush(stderr);                                                    \
         }                                                                      \
     } while (0)
 
@@ -33,6 +35,7 @@
         if ((x) == -1) {                                                       \
             fprintf(stderr, "error at %s:%d@%s '%s': %s\n", __FILE__,          \
                     __LINE__, __func__, #x, strerror(errno));                  \
+            fflush(stderr);                                                    \
             exit(1);                                                           \
         }                                                                      \
     } while (0)
@@ -41,5 +44,5 @@ enum errors {
     NONE,
     ALLOC,
     UNKNOWN_CMD,
-    INVALID_ARGS,
+	DISCONNECT,
 };

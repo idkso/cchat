@@ -1,9 +1,8 @@
 #pragma once
-#include "common.h"
+#include "users.h"
+#include <stdint.h>
 
-struct users {
-    struct pollfd *pfds;
-    char **names;
-    char **buffers;
-    size_t len, size, *name_lens, *buf_lens;
-};
+int server_init(uint16_t port);
+void server_listen(int fd, int backlog);
+void server_poll(struct users *users);
+void server_process_events(struct users *users);

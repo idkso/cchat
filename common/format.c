@@ -11,24 +11,32 @@
 static char buf[256];
 static int len = 0;
 
-static void _putc(int fd, int c) {
+static int _putc(int fd, int c) {
+	int ret;
     if (len < 255) {
         buf[len++] = c;
     } else {
         buf[len++] = c;
-        write(fd, buf, len);
+        CHECK(ret, write(fd, buf, len));
+		if (ret == 0) return DISCONNECT;
         len = 0;
     }
+	return NONE;
 }
 
-static void _flush(int fd) {
-    write(fd, buf, len);
+static int _flush(int fd) {
+	int ret;
+    CHECK(ret, write(fd, buf, len));
+	if (ret == 0) return DISCONNECT;
     len = 0;
+	return NONE;
 }
 
-static void _nputs(int fd, char *s, int len) {
-    for (int i = 0; i < len; i++)
-        _putc(fd, s[i]);
+static int _nputs(int fd, char *s, int len) {
+    for (int i = 0; i < len; i++) {
+        if (_putc(fd, s[i])) return DISCONNECT;
+	}
+	return NONE;
 }
 
 int send_command(int fd, uint32_t cmd, ...) {
@@ -65,13 +73,16 @@ int send_command(int fd, uint32_t cmd, ...) {
 
 // allocates memory in `buf`
 int read_string(int fd, uint32_t *len, char **buf) {
-    CHEXIT(read(fd, (void *)len, sizeof(uint32_t)));
+	int ret;
+    CHECK(ret, read(fd, (void *)len, sizeof(uint32_t)));
+	if (ret == 0) return DISCONNECT;
 
     *buf = malloc(*len);
     if (*buf == NULL)
         return ALLOC;
 
-    CHEXIT(read(fd, *buf, *len));
+    CHECK(ret, read(fd, *buf, *len));
+	if (ret == 0) return DISCONNECT;
     return NONE;
 }
 
@@ -79,27 +90,27 @@ int read_string(int fd, uint32_t *len, char **buf) {
 int receive_response(int fd, struct response *out) {
     uint32_t op;
     char *buf;
-    int len;
+    int ret;
 
-    CHECK(len, read(fd, (void *)&op, sizeof(uint32_t)));
-    if (len == -1)
-        exit(1);
+    CHECK(ret, read(fd, (void *)&op, sizeof(uint32_t)));
+	if (ret == 0) return DISCONNECT;
 
     switch (op) {
     case R_MSG:
         out->r = R_MSG;
-        if (read_string(fd, &op, &buf) != NONE)
-            return ALLOC;
+		if ((ret = read_string(fd, &op, &buf)) != NONE)
+            return ret;
         out->msg.name_len = op;
         out->msg.name = buf;
 
-        if (read_string(fd, &op, &buf) != NONE)
-            return ALLOC;
+        if ((ret = read_string(fd, &op, &buf)) != NONE)
+            return ret;
         out->msg.msg_len = op;
         out->msg.msg = buf;
         break;
     case R_SETNICK:
-        read(fd, (void *)&op, sizeof(uint32_t));
+        CHECK(ret, read(fd, (void *)&op, sizeof(uint32_t)));
+		if (ret == 0) return DISCONNECT;
         out->r = R_SETNICK;
         out->ok = op;
         break;
@@ -108,8 +119,8 @@ int receive_response(int fd, struct response *out) {
     case R_STOP_TYPING:
     case R_USER_JOIN:
         out->r = op;
-        if (read_string(fd, &op, &buf) != NONE)
-            return ALLOC;
+		if ((ret = read_string(fd, &op, &buf)) != NONE)
+            return ret;
         out->stop_typing.len = op;
         out->stop_typing.value = buf;
         break;
@@ -131,23 +142,28 @@ int send_response(int fd, uint32_t cmd, ...) {
     case R_MSG:
         len = va_arg(list, uint32_t);
         string = va_arg(list, char *);
-        _nputs(fd, (void *)&cmd, sizeof(uint32_t));
-        _nputs(fd, (void *)&len, sizeof(uint32_t));
-        _nputs(fd, string, len);
+        if (_nputs(fd, (void *)&cmd, sizeof(uint32_t))) return DISCONNECT;
+        if (_nputs(fd, (void *)&len, sizeof(uint32_t))) return DISCONNECT;
+        if (_nputs(fd, string, len)) return DISCONNECT;
 
         len = va_arg(list, uint32_t);
         string = va_arg(list, char *);
-        _nputs(fd, (void *)&len, sizeof(uint32_t));
-        _nputs(fd, string, len);
+        if (_nputs(fd, (void *)&len, sizeof(uint32_t))) return DISCONNECT;
+        if (_nputs(fd, string, len)) return DISCONNECT;
         break;
     case R_GETNICK:
     case R_START_TYPING:
     case R_STOP_TYPING:
         len = va_arg(list, uint32_t);
         string = va_arg(list, char *);
-        _nputs(fd, (void *)&cmd, sizeof(uint32_t));
-        _nputs(fd, (void *)&len, sizeof(uint32_t));
-        _nputs(fd, string, len);
+        if (_nputs(fd, (void *)&cmd, sizeof(uint32_t))) return DISCONNECT;
+        if (_nputs(fd, (void *)&len, sizeof(uint32_t))) return DISCONNECT;
+        if (_nputs(fd, string, len)) return DISCONNECT;
+        break;
+    case R_SETNICK:
+        len = va_arg(list, int);
+        if (_nputs(fd, (void *)&cmd, sizeof(uint32_t))) return DISCONNECT;
+        if (_nputs(fd, (void *)&len, sizeof(int))) return DISCONNECT;
         break;
     default:
         return UNKNOWN_CMD;
@@ -161,19 +177,18 @@ int send_response(int fd, uint32_t cmd, ...) {
 int receive_command(int fd, struct command *out) {
     uint32_t op;
     char *buf;
-    int len;
+    int len, ret;
 
     CHECK(len, read(fd, (void *)&op, sizeof(uint32_t)));
-    if (len == -1)
-        exit(1);
+	if (len == 0) return DISCONNECT;
 
     out->type = op;
 
     switch (op) {
     case C_MSG:
     case C_SETNICK:
-        if (read_string(fd, &op, &buf) != NONE)
-            return ALLOC;
+		if ((ret = read_string(fd, &op, &buf)) != NONE)
+            return ret;
         out->setnick.len = op;
         out->setnick.value = buf;
         break;
