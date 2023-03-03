@@ -44,5 +44,5 @@ enum errors {
     NONE,
     ALLOC,
     UNKNOWN_CMD,
-	DISCONNECT,
+    DISCONNECT,
 };

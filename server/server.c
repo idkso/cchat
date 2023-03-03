@@ -16,9 +16,9 @@ void send_event(struct users *users, uint32_t event, uint32_t user, ...) {
         buf = va_arg(list, char *);
         for (uint32_t i = 0; i < users->len; i++) {
             if (send_response(users->pfds[i].fd, R_MSG, users->name_lens[user],
-							  users->names[user], num, buf) == DISCONNECT) {
-				users_del(users, i);
-			}
+                              users->names[user], num, buf) == DISCONNECT) {
+                users_del(users, i);
+            }
         }
         break;
     case R_START_TYPING:
@@ -27,22 +27,23 @@ void send_event(struct users *users, uint32_t event, uint32_t user, ...) {
             if (i == user)
                 continue;
             if (send_response(users->pfds[i].fd, event, users->name_lens[user],
-							  users->names[user]) == DISCONNECT) {
-				users_del(users, i);
-			}
+                              users->names[user]) == DISCONNECT) {
+                users_del(users, i);
+            }
         }
         break;
     case R_GETNICK:
-        if (send_response(users->pfds[user].fd, R_GETNICK, users->name_lens[user],
-						  users->names[user]) == DISCONNECT) {
-			users_del(users, user);
-		}
+        if (send_response(users->pfds[user].fd, R_GETNICK,
+                          users->name_lens[user],
+                          users->names[user]) == DISCONNECT) {
+            users_del(users, user);
+        }
         break;
     case R_SETNICK:
         num = va_arg(list, int);
         if (send_response(users->pfds[user].fd, R_SETNICK, num) == DISCONNECT) {
-			users_del(users, user);
-		}
+            users_del(users, user);
+        }
         break;
     default:
         err("unknown command");
@@ -82,33 +83,33 @@ void server_poll(struct users *users) {
     CHECK(conn, accept(users->pfds[-1].fd, NULL, NULL));
     if (conn == -1) {
         return;
-	}
+    }
 
-	printf("adding user %lu\n", users->len);
+    printf("adding user %lu\n", users->len);
     users->pfds[users->len].fd = conn;
     users->pfds[users->len].events = POLLIN | POLLPRI;
     users->len++;
 }
 
 void server_process_events(struct users *users) {
-	int ret;
+    int ret;
     struct command in;
 
     for (uint32_t i = 0; i < users->len; i++) {
         if ((users->pfds[i].revents & POLLIN) == 0) {
-			if (users->pfds[i].revents & POLLHUP)
-				users_del(users, i);
-			continue;
+            if (users->pfds[i].revents & POLLHUP)
+                users_del(users, i);
+            continue;
         }
 
         if ((ret = receive_command(users->pfds[i].fd, &in)) != NONE) {
-			if (ret == DISCONNECT) {
-				users_del(users, i);
-				continue;
-			} else {
-				err("error allocating memory");
-				exit(1);
-			}
+            if (ret == DISCONNECT) {
+                users_del(users, i);
+                continue;
+            } else {
+                err("error allocating memory");
+                exit(1);
+            }
         }
 
         switch (in.type) {

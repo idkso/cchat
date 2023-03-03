@@ -43,7 +43,7 @@ void users_init(struct users *users, int server, int clients) {
 }
 
 void users_del(struct users *users, int user) {
-	printf("deleting user %d\n", user);
-	users->len--;
+    printf("deleting user %d\n", user);
+    users->len--;
     users->pfds[user] = users->pfds[users->len];
 }
