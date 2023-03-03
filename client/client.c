@@ -2,6 +2,7 @@
 #include "common.h"
 #include "messages.h"
 #include "typing.h"
+#include "input.h"
 #include <fcntl.h>
 #include <netdb.h>
 #include <sys/ioctl.h>
@@ -9,6 +10,7 @@
 #include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 struct winsize size;
 
@@ -70,9 +72,11 @@ void print_messages(int tty, struct messages *msgs) {
 }
 
 int main(int argc, char *argv[]) {
+	uncook();
     ioctl(0, TIOCGWINSZ, &size);
 
     char buf[256], *port;
+	char c;
     int tty = open("/dev/tty", O_WRONLY);
     int len, fd = 0;
     int screen_size = size.ws_row;
@@ -83,6 +87,7 @@ int main(int argc, char *argv[]) {
     struct messages msgs;
     struct typing_users typing;
     struct response in;
+	struct input inp;
 
     if (argc < 2) {
         fprintf(stderr, "usage: %s <hostname> [port]\n", argv[0]);
@@ -92,6 +97,7 @@ int main(int argc, char *argv[]) {
     port = argc == 3 ? argv[2] : "6969";
 
     messages_init(&msgs, 69);
+	input_init(&inp);
     init(argv[1], port, &fd, pfds);
 
     dprintf(tty, "\x1b[%d;0H[%s] >> ", screen_size, username);
@@ -100,11 +106,15 @@ int main(int argc, char *argv[]) {
         CHEXIT(poll(pfds, 2, -1));
 
         if (pfds[0].revents & POLLIN) { //  User types a message
-            CHECK(len, read(STDIN_FILENO, buf, 256));
+            CHECK(len, read(STDIN_FILENO, &c, 1));
             if (len == -1)
                 exit(1);
-
-            send_command(pfds[1].fd, C_MSG, len, buf);
+			
+            input_parse(&inp, &pfds[1], c);
+            dprintf(tty, "\x1b[H\x1b[J");
+            print_messages(tty, &msgs);
+            dprintf(tty, "\x1b[0J\x1b[%d;0H%s\n[%s] >> %.*s", screen_size,
+                        indicator, username, inp.msg_len, inp.msg);
         }
 
         if (pfds[1].revents & POLLIN) { //  Server broadcasts a new message
@@ -114,13 +124,18 @@ int main(int argc, char *argv[]) {
             case R_MSG:
                 append(&msgs, in.msg.msg, in.msg.msg_len, in.msg.name,
                        in.msg.name_len);
-                print_messages(tty, &msgs);
 
-                get_indicator(&typing, indicator);
-                dprintf(tty, "\x1b[%d;0H%s\n[%s] >> ", screen_size - 1,
-                        indicator, username);
+                break;
+            case R_START_TYPING:
+                typing_add_user(&typing, in.start_typing.value, in.start_typing.len);
                 break;
             }
+
+            typing_get_indicator(&typing, indicator);
+            dprintf(tty, "\x1b[H\x1b[J");
+            print_messages(tty, &msgs);
+            dprintf(tty, "\x1b[%d;0H%s\n[%s] >> %.*s", screen_size,
+                    indicator, username, inp.msg_len, inp.msg);
         }
     }
 }
