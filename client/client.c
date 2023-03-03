@@ -30,7 +30,9 @@ void uncook(void) {
     tcsetattr(STDIN_FILENO, TCSANOW, &raw);
 }
 
-void cook(void) { tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig); }
+void cook(void) {
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig);
+}
 
 void init(const char *hostname, const char *port, int *fd,
           struct pollfd pfds[2]) {

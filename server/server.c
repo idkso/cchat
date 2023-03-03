@@ -5,7 +5,7 @@
 
 void send_event(struct users *users, uint32_t event, uint32_t user, ...) {
     char *buf;
-    int num;
+    int num, ret;
     va_list list;
 
     va_start(list, user);
@@ -15,8 +15,10 @@ void send_event(struct users *users, uint32_t event, uint32_t user, ...) {
         num = va_arg(list, uint32_t);
         buf = va_arg(list, char *);
         for (uint32_t i = 0; i < users->len; i++) {
-            if (send_response(users->pfds[i].fd, R_MSG, users->name_lens[user],
-                              users->names[user], num, buf) == DISCONNECT) {
+            ret =
+                send_response(users->pfds[i].fd, R_MSG, users->name_lens[user],
+                              users->names[user], num, buf);
+            if (ret == DISCONNECT) {
                 users_del(users, i);
             }
         }
@@ -26,22 +28,24 @@ void send_event(struct users *users, uint32_t event, uint32_t user, ...) {
         for (uint32_t i = 0; i < users->len; i++) {
             if (i == user)
                 continue;
-            if (send_response(users->pfds[i].fd, event, users->name_lens[user],
-                              users->names[user]) == DISCONNECT) {
+            ret = send_response(users->pfds[i].fd, event,
+                                users->name_lens[user], users->names[user]);
+            if (ret == DISCONNECT) {
                 users_del(users, i);
             }
         }
         break;
     case R_GETNICK:
-        if (send_response(users->pfds[user].fd, R_GETNICK,
-                          users->name_lens[user],
-                          users->names[user]) == DISCONNECT) {
+        ret = send_response(users->pfds[user].fd, R_GETNICK,
+                            users->name_lens[user], users->names[user]);
+        if (ret == DISCONNECT) {
             users_del(users, user);
         }
         break;
     case R_SETNICK:
         num = va_arg(list, int);
-        if (send_response(users->pfds[user].fd, R_SETNICK, num) == DISCONNECT) {
+        ret = send_response(users->pfds[user].fd, R_SETNICK, num);
+        if (ret == DISCONNECT) {
             users_del(users, user);
         }
         break;
@@ -70,7 +74,9 @@ int server_init(uint16_t port) {
     return fd;
 }
 
-void server_listen(int fd, int backlog) { CHEXIT(listen(fd, backlog)); }
+void server_listen(int fd, int backlog) {
+    CHEXIT(listen(fd, backlog));
+}
 
 void server_poll(struct users *users) {
     int conn;
