@@ -69,14 +69,14 @@ void init(const char *hostname, const char *port, int *fd,
     pfds[1].events = POLLIN | POLLPRI;
 }
 
-void print_screen(int tty, int screen_size, char *username, char *indicator) {
+void print_screen(int tty, int screen_size, int username_len, char *username, char *indicator) {
 
     dprintf(tty, "\x1b[H\x1b[J");
     for (int x = 0; x < msgs.len; x++) {
         dprintf(tty, "[%.*s] %.*s\n", msgs.name_lens[x], msgs.names[x], msgs.msg_lens[x], msgs.msgs[x]);
     }
     typing_get_indicator(&typing, indicator);
-    dprintf(tty, "\x1b[%d;0H%s\n[%s] >> %.*s", screen_size, indicator, username,
+    dprintf(tty, "\x1b[%d;0H%s\n[%.*s] >> %.*s", screen_size, indicator, username_len, username,
             inp.msg_len, inp.msg);
 }
 
@@ -90,6 +90,7 @@ int main(int argc, char *argv[]) {
     int len, fd = 0;
     int screen_size = size.ws_row;
     char username[50] = "username";
+	int username_len = strlen(username);
     char indicator[50];
 
     if (argc < 2) {
@@ -104,7 +105,7 @@ int main(int argc, char *argv[]) {
     init(argv[1], port, &fd, pfds);
 
     send_command(pfds[1].fd, C_GETNICK);
-    dprintf(tty, "\x1b[%d;0H[%s] >> ", screen_size, username);
+    dprintf(tty, "\x1b[%d;0H[%.*s] >> ", screen_size, username_len, username);
 
     while (true) {
         CHEXIT(poll(pfds, 2, -1));
@@ -115,7 +116,7 @@ int main(int argc, char *argv[]) {
                 exit(1);
 
             input_parse(&inp, &pfds[1], c);
-            print_screen(tty, screen_size, username, indicator);
+            print_screen(tty, screen_size, username_len, username, indicator);
         }
 
         if (pfds[1].revents & POLLIN) { //  Server broadcasts a new message
@@ -124,6 +125,7 @@ int main(int argc, char *argv[]) {
             switch (in.r) {
             case R_GETNICK:
                 memcpy(username, in.getnick.value, in.getnick.len);
+				username_len = in.getnick.len;
                 break;
             case R_MSG:
                 append(&msgs, in.msg.msg, in.msg.msg_len, in.msg.name,
@@ -138,7 +140,7 @@ int main(int argc, char *argv[]) {
                 break;
             }
 
-            print_screen(tty, screen_size, username, indicator);
+            print_screen(tty, screen_size, username_len, username, indicator);
         }
     }
 }
