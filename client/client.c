@@ -1,16 +1,16 @@
 #include "command.h"
 #include "common.h"
+#include "input.h"
 #include "messages.h"
 #include "typing.h"
-#include "input.h"
 #include <fcntl.h>
 #include <netdb.h>
+#include <stdlib.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
-#include <stdlib.h>
 
 struct winsize size;
 
@@ -64,30 +64,36 @@ void init(const char *hostname, const char *port, int *fd,
     pfds[1].events = POLLIN | POLLPRI;
 }
 
-void print_messages(int tty, struct messages *msgs) {
+void print_screen(struct messages *msgs, struct input *inp,
+                  struct typing_users *typing, int tty, int screen_size,
+                  char *username, char *indicator) {
+
     dprintf(tty, "\x1b[H\x1b[J");
     for (int x = 0; x < msgs->len; x++) {
         dprintf(tty, "%.*s\n", msgs->msg_lens[x], msgs->msgs[x]);
     }
+    typing_get_indicator(typing, indicator);
+    dprintf(tty, "\x1b[%d;0H%s\n[%s] >> %.*s", screen_size, indicator, username,
+            inp->msg_len, inp->msg);
 }
 
 int main(int argc, char *argv[]) {
-	uncook();
+    uncook();
     ioctl(0, TIOCGWINSZ, &size);
 
-    char buf[256], *port;
-	char c;
+    char *port;
+    char c;
     int tty = open("/dev/tty", O_WRONLY);
     int len, fd = 0;
     int screen_size = size.ws_row;
-    char username[] = "username";
+    char username[50] = "username";
     char indicator[50];
 
     struct pollfd pfds[2];
     struct messages msgs;
     struct typing_users typing;
     struct response in;
-	struct input inp;
+    struct input inp;
 
     if (argc < 2) {
         fprintf(stderr, "usage: %s <hostname> [port]\n", argv[0]);
@@ -97,9 +103,10 @@ int main(int argc, char *argv[]) {
     port = argc == 3 ? argv[2] : "6969";
 
     messages_init(&msgs, 69);
-	input_init(&inp);
+    input_init(&inp);
     init(argv[1], port, &fd, pfds);
 
+    send_command(pfds[1].fd, C_GETNICK);
     dprintf(tty, "\x1b[%d;0H[%s] >> ", screen_size, username);
 
     while (true) {
@@ -109,33 +116,34 @@ int main(int argc, char *argv[]) {
             CHECK(len, read(STDIN_FILENO, &c, 1));
             if (len == -1)
                 exit(1);
-			
+
             input_parse(&inp, &pfds[1], c);
-            dprintf(tty, "\x1b[H\x1b[J");
-            print_messages(tty, &msgs);
-            dprintf(tty, "\x1b[0J\x1b[%d;0H%s\n[%s] >> %.*s", screen_size,
-                        indicator, username, inp.msg_len, inp.msg);
+            print_screen(&msgs, &inp, &typing, tty, screen_size, username,
+                         indicator);
         }
 
         if (pfds[1].revents & POLLIN) { //  Server broadcasts a new message
             receive_response(pfds[1].fd, &in);
 
             switch (in.r) {
+            case R_GETNICK:
+                memcpy(username, in.getnick.value, in.getnick.len);
+                break;
             case R_MSG:
                 append(&msgs, in.msg.msg, in.msg.msg_len, in.msg.name,
                        in.msg.name_len);
-
                 break;
             case R_START_TYPING:
-                typing_add_user(&typing, in.start_typing.value, in.start_typing.len);
+                typing_add_user(&typing, in.start_typing.value,
+                                in.start_typing.len);
+                break;
+            case R_STOP_TYPING:
+                typing.amt--;
                 break;
             }
 
-            typing_get_indicator(&typing, indicator);
-            dprintf(tty, "\x1b[H\x1b[J");
-            print_messages(tty, &msgs);
-            dprintf(tty, "\x1b[%d;0H%s\n[%s] >> %.*s", screen_size,
-                    indicator, username, inp.msg_len, inp.msg);
+            print_screen(&msgs, &inp, &typing, tty, screen_size, username,
+                         indicator);
         }
     }
 }

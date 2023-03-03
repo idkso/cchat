@@ -9,13 +9,16 @@ void input_init(struct input *inp) {
 
 int input_parse(struct input *inp, struct pollfd *fd, char c) {
     if (c == 127) { //  Backspace
+        if (inp->msg_len <= 0) {
+            return NONE;
+        } //  Dont let msg_len go negative
         inp->msg[inp->msg_len--] = '\0';
     } else if (c == 13) { //  Enter
         send_command(fd->fd, C_MSG, inp->msg_len, inp->msg);
         inp->msg[0] = '\0';
         inp->msg_len = 0;
     } else { //  Insert char
-        inp->msg[inp->msg_len++] = c; 
+        inp->msg[inp->msg_len++] = c;
     }
 
     if (inp->typing == false && inp->msg_len > 0) {

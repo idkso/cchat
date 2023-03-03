@@ -1,11 +1,11 @@
+#include "command.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "command.h"
 
 struct input {
-	char msg[2048];
-	int msg_len;
-	bool typing;
+    char msg[2048];
+    int msg_len;
+    bool typing;
 };
 
 void input_init(struct input *);
