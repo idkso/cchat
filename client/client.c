@@ -73,7 +73,7 @@ void print_screen(int tty, int screen_size, char *username, char *indicator) {
 
     dprintf(tty, "\x1b[H\x1b[J");
     for (int x = 0; x < msgs.len; x++) {
-        dprintf(tty, "%.*s\n", msgs.msg_lens[x], msgs.msgs[x]);
+        dprintf(tty, "[%.*s] %.*s\n", msgs.name_lens[x], msgs.names[x], msgs.msg_lens[x], msgs.msgs[x]);
     }
     typing_get_indicator(&typing, indicator);
     dprintf(tty, "\x1b[%d;0H%s\n[%s] >> %.*s", screen_size, indicator, username,
