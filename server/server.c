@@ -19,6 +19,8 @@ int broadcast_message(struct users *users, uint32_t sender, uint32_t len,
 
 int broadcast_typing(struct users *users, uint32_t sender, uint32_t ev) {
     for (uint32_t i = 0; i < users->len; i++) {
+        if (i == sender)
+            continue;
         send_response(users->pfds[i + 1].fd, ev, users->name_lens[sender],
                       users->names[sender]);
     }
