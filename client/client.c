@@ -16,6 +16,11 @@ struct winsize size;
 
 struct termios raw;
 struct termios orig;
+struct pollfd pfds[2];
+struct messages msgs;
+struct typing_users typing;
+struct response in;
+struct input inp;
 
 void uncook(void) {
     tcgetattr(STDIN_FILENO, &orig);
@@ -64,17 +69,15 @@ void init(const char *hostname, const char *port, int *fd,
     pfds[1].events = POLLIN | POLLPRI;
 }
 
-void print_screen(struct messages *msgs, struct input *inp,
-                  struct typing_users *typing, int tty, int screen_size,
-                  char *username, char *indicator) {
+void print_screen(int tty, int screen_size, char *username, char *indicator) {
 
     dprintf(tty, "\x1b[H\x1b[J");
-    for (int x = 0; x < msgs->len; x++) {
-        dprintf(tty, "%.*s\n", msgs->msg_lens[x], msgs->msgs[x]);
+    for (int x = 0; x < msgs.len; x++) {
+        dprintf(tty, "%.*s\n", msgs.msg_lens[x], msgs.msgs[x]);
     }
-    typing_get_indicator(typing, indicator);
+    typing_get_indicator(&typing, indicator);
     dprintf(tty, "\x1b[%d;0H%s\n[%s] >> %.*s", screen_size, indicator, username,
-            inp->msg_len, inp->msg);
+            inp.msg_len, inp.msg);
 }
 
 int main(int argc, char *argv[]) {
@@ -88,12 +91,6 @@ int main(int argc, char *argv[]) {
     int screen_size = size.ws_row;
     char username[50] = "username";
     char indicator[50];
-
-    struct pollfd pfds[2];
-    struct messages msgs;
-    struct typing_users typing;
-    struct response in;
-    struct input inp;
 
     if (argc < 2) {
         fprintf(stderr, "usage: %s <hostname> [port]\n", argv[0]);
@@ -118,8 +115,7 @@ int main(int argc, char *argv[]) {
                 exit(1);
 
             input_parse(&inp, &pfds[1], c);
-            print_screen(&msgs, &inp, &typing, tty, screen_size, username,
-                         indicator);
+            print_screen(tty, screen_size, username, indicator);
         }
 
         if (pfds[1].revents & POLLIN) { //  Server broadcasts a new message
@@ -142,8 +138,7 @@ int main(int argc, char *argv[]) {
                 break;
             }
 
-            print_screen(&msgs, &inp, &typing, tty, screen_size, username,
-                         indicator);
+            print_screen(tty, screen_size, username, indicator);
         }
     }
 }
