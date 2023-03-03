@@ -4,15 +4,16 @@ chat
 * todo
 things 2 todo
 ** server
-- [ ] usernames
-- [ ] user events
+- [X] usernames
+- [X] user events
 - [ ] rooms
+- [ ] make server not shit
   
 ** client
 - [ ] scrolling
-- [ ] / commands
+- [X] / commands
 - [ ] logins
-- [ ] typing indicators
+- [X] typing indicators
 - [ ] markdown
 
 ** maybe
